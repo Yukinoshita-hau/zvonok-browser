@@ -1,0 +1,92 @@
+name: zvonok-browser-poc
+services:
+  proxy:
+    build: { context: ., target: proxy }
+    networks:
+      browser: { ipv4_address: 172.30.81.2 }
+      outbound: {}
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    cpus: 0.5
+    mem_limit: 128m
+    pids_limit: 64
+    sysctls: { net.ipv4.ip_forward: "0" }
+  guard:
+    build: { context: ., dockerfile: infra/Dockerfile.guard }
+    networks:
+      browser: { ipv4_address: 172.30.81.3 }
+    cap_drop: [ALL]
+    cap_add: [NET_ADMIN]
+    security_opt: [no-new-privileges:true]
+    volumes: [guard-state:/guard]
+    tmpfs: [/run]
+    read_only: true
+    mem_limit: 32m
+    pids_limit: 16
+    healthcheck:
+      test:
+        [
+          CMD-SHELL,
+          'test "$(cat /guard/ready)" = firewall-v1 && iptables -C OUTPUT -d 172.30.81.2 -p tcp --dport 3128 -j ACCEPT',
+        ]
+      interval: 2s
+      timeout: 1s
+      retries: 15
+  worker:
+    environment:
+      XDG_CONFIG_HOME: /tmp/browser-config
+      XDG_CACHE_HOME: /tmp/browser-cache
+    build: { context: ., target: worker }
+    network_mode: service:guard
+    depends_on:
+      guard: { condition: service_healthy }
+      proxy: { condition: service_started }
+    volumes: [control:/control, guard-state:/guard:ro]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true, "seccomp=./infra/seccomp.json"]
+    read_only: true
+    tmpfs: ["/tmp:size=512m,mode=1777"]
+    shm_size: 256m
+    init: true
+    cpus: 2
+    mem_limit: 768m
+    pids_limit: 256
+    stop_grace_period: 15s
+  api:
+    build: { context: ., target: api }
+    networks:
+      control: { ipv4_address: 172.30.82.3 }
+    volumes: [control:/control]
+    environment: { DEV_TOKEN: "${DEV_TOKEN:?Set DEV_TOKEN in .env}" }
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    cpus: 0.5
+    mem_limit: 128m
+    pids_limit: 64
+    depends_on: [worker]
+  client:
+    build: { context: ., target: client }
+    networks: [control, edge]
+    ports: ["127.0.0.1:${BROWSER_PORT:-47831}:8080"]
+    depends_on: [api]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 64m
+    pids_limit: 32
+networks:
+  edge: {}
+  control:
+    internal: true
+    ipam: { config: [{ subnet: 172.30.82.0/24 }] }
+  browser:
+    internal: true
+    ipam: { config: [{ subnet: 172.30.81.0/24 }] }
+  outbound: {}
+volumes:
+  control: {}
+  guard-state: {}
+

@@ -1,0 +1,14 @@
+port: 7880
+bind_addresses: ["0.0.0.0"]
+rtc:
+  tcp_port: 47834
+  udp_port: 47835
+  node_ip: 127.0.0.1
+  use_external_ip: false
+  enable_loopback_candidate: true
+keys:
+  spike: PLACEHOLDER
+logging:
+  level: warn
+
+

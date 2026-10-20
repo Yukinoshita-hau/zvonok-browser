@@ -1,0 +1,8 @@
+<!doctype html><meta charset="utf-8"><style>
+body{margin:0;background:white;color:#14283c;font:24px sans-serif}header{position:fixed;top:0;background:white;width:100%;height:90px;z-index:2}main{padding:110px 24px;height:2600px}input,button{font:24px sans-serif}#box{width:80px;height:80px;background:#245cd0;animation:move 3s infinite alternate linear}@keyframes move{to{transform:translateX(1000px)}}p{line-height:1.6}
+</style><header><canvas id="clock" width="1280" height="48"></canvas><span id="status">Server Chromium capture — action 0</span></header><main><h1>Real Chromium text clarity 1280 × 720</h1><input aria-label="Text" id="text"><button id="change">Change pixels</button><div id="box"></div><p>ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789</p><p>Scrolling content — line 1</p><p>Scrolling content — line 2</p><p>Scrolling content — line 3</p><p>Scrolling content — line 4</p><p>Scrolling content — line 5</p><p>Scrolling content — line 6</p></main><script>
+let action=0;const c=document.querySelector('canvas').getContext('2d');
+function changed(){action++;document.querySelector('#status').textContent='Server Chromium capture — action '+action}
+document.querySelector('button').onclick=changed;document.querySelector('input').oninput=changed;
+function draw(){c.fillStyle='white';c.fillRect(0,0,1280,48);let now=BigInt(Date.now());for(let i=0;i<48;i++){c.fillStyle=(now>>BigInt(i))&1n?'#f0f0f0':'#000';c.fillRect(16+i*12,16,12,24)}c.fillStyle=action%2?'#00ff00':'#ff0000';c.fillRect(640,16,80,24);requestAnimationFrame(draw)}draw();
+</script>

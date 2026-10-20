@@ -1,0 +1,5 @@
+FROM zvonok-browser-media-publisher:latest
+COPY experiments/capture/broker.mjs /media/broker.mjs
+COPY experiments/capture/rtc-relay.mjs /media/rtc-relay.mjs
+
+COPY experiments/capture/publisher.mjs /media/publisher.mjs

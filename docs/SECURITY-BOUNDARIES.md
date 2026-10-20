@@ -1,0 +1,21 @@
+# Security boundaries
+
+Local trusted-site PoC, not a public browser hosting service. Loopback gateway is the sole published listener. Never supply production credentials. Containers do not join Zvonok networks. Worker has no Zvonok credentials, Docker socket or host bind mounts.
+
+Worker uses guard's network namespace on an internal bridge. IPv4/IPv6 OUTPUT defaults DROP; only proxy fixed IP TCP/3128 is allowed. Docker embedded DNS NAT OUTPUT hooks are removed before readiness. Direct DNS, QUIC, WebRTC/UDP, IPv6, loopback TCP and other TCP destinations are denied regardless of browser flags. Guard alone has NET_ADMIN in this dedicated namespace; worker has no capabilities. A stopped proxy gives no fallback. Guard and proxy do not mount the control socket volume.
+
+Proxy only accepts exact `example.com:443` and `www.selenium.dev:443` CONNECT authorities. It resolves IPv4 upstream addresses itself, checks every returned IPv4 and connects to a checked literal address. IPv6 upstream is unsupported; never selected. Private, metadata, loopback, reserved and special IPv4 ranges fail closed. Each redirected host requires a new checked tunnel. No HTTP forward proxy or arbitrary CONNECT ports. IP forwarding disabled. Proxy cannot connect to API because it has no control network membership.
+
+TLS is not intercepted: proxy guarantees destination boundaries, not HTTPS contents/path. A trusted allowlisted origin could itself provide a relay; this PoC does not claim protection from a malicious allowlisted service. Playwright rejects non-allowlisted requests/redirects/subresources, service workers and all WebSockets; network rules still apply if interception is bypassed. WSS to an allowed host shares the TLS tunnel boundary, so Playwright WebSocket rejection is additional protocol policy, not network-level content inspection. Dangerous schemes cannot enter via API. Browser files remain inside disposable container tmpfs; filesystem schemes are not API navigation destinations.
+
+Chromium launches `chromiumSandbox: true` as UID 1000, with no `--no-sandbox`; Playwright's version-matched official seccomp profile permits namespace sandbox calls. No privileged, host IPC/network or unconfined seccomp. Read-only rootfs, no-new-privileges, cap_drop ALL, init, PID/memory/CPU limits. Sandbox verification must use an actual Chromium launch; configuration alone is insufficient. Official Docker guidance: https://playwright.dev/docs/docker .
+
+Control socket directory mode 0700, socket 0660, shared only by UID 1000 API and worker. Chromium runs under worker UID, so OS-level separation from a fully compromised browser process is not claimed; network-isolated page content cannot open Unix sockets through browser APIs. Stronger process/user or VM boundaries are future hardening. Guard's tiny health-state volume contains no control data or secrets.
+
+The seccomp profile derives from Playwright v1.64.1 `utils/docker/seccomp_profile.json`. One measured adaptation permits `chroot` unconditionally at the seccomp layer: Chromium uses it inside its new user namespace. The upstream profile conditioned it on container CAP_SYS_CHROOT, conflicting with cap_drop ALL. Kernel capabilities still prohibit host-namespace chroot; no container capability was added. Chromium's actual chrome://sandbox status confirmed namespace/PID/network namespaces and Seccomp-BPF. Full Chromium uses XDG config/cache under /tmp (tmpfs) so crashpad does not require a writable home directory.
+
+Browser context permissions start empty; no microphone/camera/geolocation/clipboard grants. Downloads and popup pages close; dialogs dismiss; no persistent profile. Logs disabled on HTTP services and gateway API routes. Client bearer is memory-only; local manual paste is user-initiated. nginx checks Host/Origin and sends CSP; no public CORS or third-party scripts.
+
+Chromium additionally starts with `--deny-permission-prompts`, which [Chromium documents](https://chromium.googlesource.com/chromium/src/+/HEAD/components/permissions/) as automatic denial of permission prompts. The real browser harness asserts geolocation returns PERMISSION_DENIED; no fake microphone/camera devices are introduced.
+
+FAIL/NOT RUN entries in report block claims of secure acceptance. Do not solve a sandbox/firewall failure by disabling protection.

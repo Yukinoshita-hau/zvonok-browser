@@ -1,0 +1,14 @@
+node_modules
+**/dist
+**/*.tsbuildinfo
+.env
+.git
+artifacts
+artifacts*.log
+
+
+media/node_modules
+media/livekit.local.yaml
+
+experiments/capture/*.local.yaml
+

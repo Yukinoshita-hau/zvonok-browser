@@ -1,0 +1,127 @@
+name: zvonok-browser-capture
+x-limits: &limits
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  read_only: true
+  init: true
+  pids_limit: 128
+  mem_limit: 512m
+  cpus: 2
+services:
+  livekit:
+    <<: *limits
+    image: livekit/livekit-server:v1.9.12
+    command: ["--config", "/config/livekit.yaml"]
+    user: "1000:1000"
+    volumes: ["./experiments/capture/livekit.local.yaml:/config/livekit.yaml:ro"]
+    ports: ["127.0.0.1:47933:7880", "127.0.0.1:47934:47836"]
+    networks: [media, rtc-edge]
+  broker:
+    <<: *limits
+    image: zvonok-browser-capture-media:2b1
+    command: [node, broker.mjs]
+    environment: { DEV_TOKEN: "${DEV_TOKEN:?Set DEV_TOKEN}" }
+    volumes:
+      ["auth:/auth", "./experiments/capture/livekit.local.yaml:/secrets/livekit.yaml:ro"]
+    networks: [authnet]
+    mem_limit: 128m
+    healthcheck:
+      test: [CMD, node, -e, "require('fs').accessSync('/auth/token.sock')"]
+      interval: 2s
+      timeout: 1s
+      retries: 15
+  publisher:
+    <<: *limits
+    image: zvonok-browser-capture-media:2b1
+    network_mode: service:livekit
+    depends_on:
+      livekit: { condition: service_started }
+      broker: { condition: service_healthy }
+    volumes: ["auth:/auth", "frames:/frames"]
+    environment:
+      {
+        WIDTH: "${MEDIA_WIDTH:-1280}",
+        HEIGHT: "${MEDIA_HEIGHT:-720}",
+        FPS: "${MEDIA_FPS:-15}",
+      }
+    restart: "no"
+  rtc-relay:
+    <<: *limits
+    image: zvonok-browser-capture-media:2b1
+    command: [node, rtc-relay.mjs]
+    network_mode: service:livekit
+    depends_on: [livekit]
+    mem_limit: 64m
+    cpus: 0.25
+    pids_limit: 32
+  viewer:
+    <<: *limits
+    image: zvonok-browser-capture-viewer:2b1
+    volumes: ["./experiments/capture/nginx.conf:/etc/nginx/conf.d/default.conf:ro"]
+    ports: ["127.0.0.1:47932:8080"]
+    networks: [authnet, edge]
+    depends_on: [broker]
+    tmpfs: [/tmp]
+    mem_limit: 128m
+  guard:
+    image: zvonok-browser-capture-guard:2b1
+    cap_drop: [ALL]
+    cap_add: [NET_ADMIN]
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    volumes: [guard-state:/guard]
+    tmpfs: [/run]
+    mem_limit: 32m
+    pids_limit: 16
+    networks:
+      browser: {ipv4_address: 172.30.85.3}
+    healthcheck:
+      test: [CMD-SHELL, 'test "$(cat /guard/ready)" = firewall-v1']
+      interval: 2s
+      retries: 15
+  proxy:
+    <<: *limits
+    image: zvonok-browser-poc-proxy:latest
+    networks:
+      browser: {ipv4_address: 172.30.85.2}
+      outbound: {}
+    sysctls: {net.ipv4.ip_forward: "0"}
+    mem_limit: 128m
+  capture:
+    <<: *limits
+    image: zvonok-browser-capture:2b1
+    command: [node24, experiments/capture/run.mjs]
+    network_mode: service:guard
+    depends_on:
+      guard: {condition: service_healthy}
+      proxy: {condition: service_started}
+      publisher: {condition: service_started}
+    volumes: [frames:/frames, guard-state:/guard:ro]
+    security_opt: [no-new-privileges:true, "seccomp=./infra/seccomp.json"]
+    tmpfs: ["/tmp:size=512m,mode=1777"]
+    shm_size: 256m
+    mem_limit: 1024m
+    pids_limit: 256
+    environment:
+      FPS: "${MEDIA_FPS:-15}"
+      CAPTURE_METHOD: "${CAPTURE_METHOD:-x11}"
+      XDG_CONFIG_HOME: /tmp/config
+      XDG_CACHE_HOME: /tmp/cache
+networks:
+  browser:
+    internal: true
+    ipam: {config: [{subnet: 172.30.85.0/24}]}
+  outbound: {}
+  rtc-edge: {}
+  media: { internal: true }
+  authnet: { internal: true }
+  edge: {}
+volumes:
+  guard-state: {}
+  auth: {}
+  frames: {}
+
+
+
+
+

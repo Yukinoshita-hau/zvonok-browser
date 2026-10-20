@@ -1,0 +1,86 @@
+name: zvonok-browser-media
+x-limits: &limits
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  read_only: true
+  init: true
+  pids_limit: 128
+  mem_limit: 512m
+  cpus: 2
+services:
+  livekit:
+    <<: *limits
+    image: livekit/livekit-server:v1.9.12
+    command: ["--config", "/config/livekit.yaml"]
+    user: "1000:1000"
+    volumes: ["./media/livekit.local.yaml:/config/livekit.yaml:ro"]
+    ports: ["127.0.0.1:47833:7880", "127.0.0.1:47834:47836"]
+    networks: [media, rtc-edge]
+  broker:
+    <<: *limits
+    build: { context: ., dockerfile: media/Dockerfile }
+    command: [node, broker.mjs]
+    environment: { DEV_TOKEN: "${DEV_TOKEN:?Set DEV_TOKEN}" }
+    volumes:
+      ["auth:/auth", "./media/livekit.local.yaml:/secrets/livekit.yaml:ro"]
+    networks: [authnet]
+    mem_limit: 128m
+    healthcheck:
+      test: [CMD, node, -e, "require('fs').accessSync('/auth/token.sock')"]
+      interval: 2s
+      timeout: 1s
+      retries: 15
+  publisher:
+    <<: *limits
+    build: { context: ., dockerfile: media/Dockerfile }
+    network_mode: service:livekit
+    depends_on:
+      livekit: { condition: service_started }
+      broker: { condition: service_healthy }
+    volumes: ["auth:/auth", "frames:/frames"]
+    environment:
+      {
+        WIDTH: "${MEDIA_WIDTH:-1280}",
+        HEIGHT: "${MEDIA_HEIGHT:-720}",
+        FPS: "${MEDIA_FPS:-15}",
+      }
+    restart: on-failure:3
+  rtc-relay:
+    <<: *limits
+    build: { context: ., dockerfile: media/Dockerfile }
+    command: [node, rtc-relay.mjs]
+    network_mode: service:livekit
+    depends_on: [livekit]
+    mem_limit: 64m
+    cpus: 0.25
+    pids_limit: 32
+  generator:
+    <<: *limits
+    build: { context: ., dockerfile: media/Dockerfile }
+    command: [node, generator.mjs]
+    network_mode: none
+    depends_on: [publisher]
+    volumes: ["frames:/frames"]
+    environment:
+      {
+        WIDTH: "${MEDIA_WIDTH:-1280}",
+        HEIGHT: "${MEDIA_HEIGHT:-720}",
+        FPS: "${MEDIA_FPS:-15}",
+      }
+  viewer:
+    <<: *limits
+    build: { context: ., target: client }
+    volumes: ["./media/nginx.conf:/etc/nginx/conf.d/default.conf:ro"]
+    ports: ["127.0.0.1:47832:8080"]
+    networks: [authnet, edge]
+    depends_on: [broker]
+    tmpfs: [/tmp]
+    mem_limit: 128m
+networks:
+  rtc-edge: {}
+  media: { internal: true }
+  authnet: { internal: true }
+  edge: {}
+volumes:
+  auth: {}
+  frames: {}

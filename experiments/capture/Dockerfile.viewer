@@ -1,0 +1,4 @@
+FROM zvonok-browser-media-viewer:latest
+USER root
+RUN sed -i -e 's/47832/47932/g' -e 's/Slice 2A · LiveKit generated video/Slice 2B.1 · Real Chromium capture/g' -e 's/LiveKit moving test pattern/LiveKit server Chromium video/g' -e 's/Unix ms генерации/Unix ms страницы/g' -e 's/генерация → decoded frame callback/page marker → decoded frame callback (uncalibrated clocks)/g' /usr/share/nginx/html/assets/*.js
+USER 101
