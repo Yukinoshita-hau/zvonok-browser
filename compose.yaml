@@ -112,6 +112,7 @@ services:
     image: zvonok-browser-media:compose
     environment:
       BROWSER_CORE_ORIGIN: "${BROWSER_UI_ORIGIN:-http://localhost:3000}"
+      BROWSER_SIGNALING_URL: "${BROWSER_SIGNALING_URL:-ws://127.0.0.1:${BROWSER_BROKER_PORT:-48033}}"
     volumes: !override [binding:/binding, auth:/auth, livekit-config:/secrets:ro]
 
   broker-2:
@@ -119,6 +120,7 @@ services:
     image: zvonok-browser-media:compose
     environment:
       BROWSER_CORE_ORIGIN: "${BROWSER_UI_ORIGIN:-http://localhost:3000}"
+      BROWSER_SIGNALING_URL: "${BROWSER_SIGNALING_URL_2:-ws://127.0.0.1:${BROWSER_BROKER_2_PORT:-48039}}"
     volumes: !override [binding-2:/binding, auth-2:/auth, livekit-config:/secrets:ro]
 
   publisher:

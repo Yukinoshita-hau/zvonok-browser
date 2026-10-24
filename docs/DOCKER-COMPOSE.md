@@ -23,13 +23,15 @@ BROWSER_INTEGRATION_KEY=<первый случайный ключ из 64 hex-с
 BROWSER_LIVEKIT_SECRET=<второй случайный ключ из 64 hex-символов>
 ZVONOK_CORE_NETWORK=zvonok-net
 BROWSER_UI_ORIGIN=http://localhost:3000
+BROWSER_SIGNALING_URL=ws://127.0.0.1:48033
+BROWSER_SIGNALING_URL_2=ws://127.0.0.1:48039
 BROWSER_MEDIA_PROFILE=720p15
 BROWSER_AUDIO=1
 ```
 
 Замените строки в угловых скобках своими значениями. Integration key связывает Core и Browser API; media secret используется только Browser LiveKit и двумя broker. Это отдельные секреты, они не заменяют JWT secret Core и ключ голосового LiveKit. Во frontend секреты не передаются. `DEV_TOKEN` здесь не используется.
 
-`BROWSER_UI_ORIGIN` — точный origin страницы: схема, hostname и порт, без завершающего `/`. `http://localhost:3000` и `http://127.0.0.1:3000` — разные origin. Текущий broker принимает только локальный HTTP origin.
+`BROWSER_UI_ORIGIN` — точный origin страницы: схема, hostname и порт, без завершающего `/`. `http://localhost:3000` и `http://127.0.0.1:3000` — разные origin. В production используйте HTTPS origin. `BROWSER_SIGNALING_URL` и `_2` — адреса, которые получат клиенты для WebSocket signaling: локально это loopback `ws://`, удалённо задайте `wss://` адреса, опубликованные через TLS reverse proxy к соответствующим Broker.
 
 ## 2. .env backend
 
@@ -96,6 +98,7 @@ docker compose up -d --build frontend
 | `BROWSER_LIVEKIT_SECRET` | Обязательные 64 случайных hex-символа, отдельные от integration key |
 | `ZVONOK_CORE_NETWORK` | `zvonok-net`; существующая сеть backend |
 | `BROWSER_UI_ORIGIN` | `http://localhost:3000`; точный origin UI для обоих broker |
+| `BROWSER_SIGNALING_URL` / `_2` | `ws://127.0.0.1:48033` / `ws://127.0.0.1:48039`; клиентские signaling URL для слотов 1 и 2. Удалённый доступ требует `wss://` через TLS reverse proxy |
 | `BROWSER_MEDIA_PROFILE` | `720p15`; также доступны `720p30`, `720p60`, `1080p30`, `1080p60` |
 | `BROWSER_WORKER_CPUS` | `4` CPU на Worker; это потолок, а не резервирование. Не задавайте больше CPU, доступных Docker |
 | `BROWSER_AUDIO` | `1` — звук страниц включён; `0` — выключен |
@@ -108,7 +111,7 @@ docker compose up -d --build frontend
 | `BROWSER_SUBNET` | `172.30.87.0/24`; внутренняя сеть Chromium |
 | `BROWSER_PROXY_IP` / `BROWSER_GUARD_IP` | `172.30.87.2` / `172.30.87.3`; при смене подсети поменяйте все три значения согласованно |
 
-По умолчанию RTC TCP relay и UDP mux доступны только на loopback и годятся только для локальной проверки. Удалённым браузерам нужен достижимый ICE candidate: установите `BROWSER_LIVEKIT_NODE_IP` в routable IPv4 узла, выберите `BROWSER_LIVEKIT_BIND_ADDRESS`, откройте соответствующие TCP/UDP порты в firewall и маршрутизируйте сигнализацию Browser Broker через reverse proxy/WebSocket. Нельзя оставлять рекламируемый `127.0.0.1` для удалённых клиентов. Порты по умолчанию — 48034/TCP и 48035/UDP. Высокие FPS — выбор профиля, не гарантия производительности: лимиты Worker 8 CPU / 1 GiB и Publisher 4 CPU / 512 MiB на слот являются потолком, а не резервированием ядер.
+По умолчанию RTC TCP relay и UDP mux доступны только на loopback и годятся только для локальной проверки. Удалённым браузерам нужен достижимый ICE candidate: установите `BROWSER_LIVEKIT_NODE_IP` в routable IPv4 узла, выберите `BROWSER_LIVEKIT_BIND_ADDRESS`, откройте соответствующие TCP/UDP порты в firewall и маршрутизируйте оба `BROWSER_SIGNALING_URL` через TLS reverse proxy/WebSocket к портам Broker `48033` и `48039`. Нельзя оставлять рекламируемый `127.0.0.1` для удалённых клиентов. Порты по умолчанию — 48034/TCP и 48035/UDP. Высокие FPS — выбор профиля, не гарантия производительности: CPU/RAM лимиты контейнеров являются потолком, а не резервированием ядер.
 
 В локальной конфигурации на loopback публикуются 48033, 48039 (membership-aware signaling) и 48034/48035 (RTC). На сервере reverse proxy направляет WebSocket signaling к broker; RTC TCP/UDP порты доступны клиентам по настройкам firewall и bind address. Browser API и Worker не публикуют host-порты. В Core-сеть входит только API; Worker сохраняет Guard, seccomp, Chromium sandbox и выход через Proxy. Профили Chromium временные, закрытие Activity удаляет их.
 
