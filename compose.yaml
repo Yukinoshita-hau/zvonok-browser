@@ -56,6 +56,7 @@ services:
   worker:
     extends: {file: compose.session.yaml, service: worker}
     cpus: "${BROWSER_WORKER_CPUS:-4}"
+    mem_limit: "${BROWSER_WORKER_MEMORY:-2g}"
     image: zvonok-browser-worker:compose
     environment:
       BROWSER_INTEGRATION: "1"
@@ -69,6 +70,7 @@ services:
   worker-2:
     extends: {file: compose.session.yaml, service: worker-2}
     cpus: "${BROWSER_WORKER_CPUS:-4}"
+    mem_limit: "${BROWSER_WORKER_MEMORY:-2g}"
     image: zvonok-browser-worker:compose
     environment:
       BROWSER_INTEGRATION: "1"
