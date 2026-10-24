@@ -97,6 +97,7 @@ docker compose up -d --build frontend
 | `ZVONOK_CORE_NETWORK` | `zvonok-net`; существующая сеть backend |
 | `BROWSER_UI_ORIGIN` | `http://localhost:3000`; точный origin UI для обоих broker |
 | `BROWSER_MEDIA_PROFILE` | `720p15`; также доступны `720p30`, `720p60`, `1080p30`, `1080p60` |
+| `BROWSER_WORKER_CPUS` | `4` CPU на Worker; это потолок, а не резервирование. Не задавайте больше CPU, доступных Docker |
 | `BROWSER_AUDIO` | `1` — звук страниц включён; `0` — выключен |
 | `SESSION_IDLE_MS` | `300000` — 5 минут без действий |
 | `SESSION_TTL_MS` | `1200000` — максимальная жизнь сессии 20 минут; текущий broker не допускает больше |
