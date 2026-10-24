@@ -457,7 +457,7 @@ app.post<{Params:{id:string;tabId:string};Body:{}}>("/sessions/:id/tabs/:tabId/c
     await target.close();touch();return dto(id);
   });
 });
-app.post<{Params:{id:string};Body:{profile:string}}>("/sessions/:id/quality",{schema:{body:{type:'object',additionalProperties:false,required:['profile'],properties:{profile:{type:'string',enum:['720p30','720p60','1080p30','1080p60']}}}}},async req=>{
+app.post<{Params:{id:string};Body:{profile:string}}>("/sessions/:id/quality",{schema:{body:{type:'object',additionalProperties:false,required:['profile'],properties:{profile:{type:'string',enum:['720p15','720p30','720p60','1080p30','1080p60']}}}}},async req=>{
   const id=live?actor(req):OWNER;active(req.params.id);fence(req,id);
   return serial(async()=>{
     active(req.params.id);fence(req,id);

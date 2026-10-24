@@ -109,13 +109,17 @@ it('a failed old membership IPC cannot clean up a newly created BrowserSession',
   const active=await state(next.sessionId);expect(active.status).toBe('active');expect(active.browserReady).toBe(true);expect(active.media.state).toBe('streaming');
   await close(next.sessionId);
 });
-it('switches the publisher profile without replacing the Chromium BrowserSession',async()=>{
-  const before=await create(),stateBefore=await state(before.sessionId);
+it.each(['1080p60','720p15'])('switches to %s without replacing the Chromium BrowserSession',async profile=>{
+  const before=await create();let stateBefore=await state(before.sessionId);
+  if(profile==='720p15') {
+    const first=await h.app.inject({method:'POST',url:`/sessions/${before.sessionId}/quality`,headers:{...owner,'x-control-epoch':stateBefore.collaboration.epoch,'x-control-generation':String(stateBefore.collaboration.generation)},payload:{profile:'720p30'}});
+    expect(first.statusCode).toBe(200);stateBefore=first.json();
+  }
   const headers={...owner,'x-control-epoch':stateBefore.collaboration.epoch,'x-control-generation':String(stateBefore.collaboration.generation)};
-  const changed=await h.app.inject({method:'POST',url:`/sessions/${before.sessionId}/quality`,headers,payload:{profile:'1080p60'}});
+  const changed=await h.app.inject({method:'POST',url:`/sessions/${before.sessionId}/quality`,headers,payload:{profile}});
   expect(changed.statusCode).toBe(200);
   expect(changed.json().sessionId).toBe(before.sessionId);
-  expect(changed.json().media).toMatchObject({profile:'1080p60',width:1920,height:1080,fps:60,state:'starting'});
+  expect(changed.json().media).toMatchObject(profile==='1080p60'?{profile,width:1920,height:1080,fps:60,state:'starting'}:{profile,width:1280,height:720,fps:15,state:'starting'});
   expect(changed.json().media.epoch).not.toBe(stateBefore.media.epoch);
   expect(h.binding).toHaveBeenCalledWith('/revoke',{sessionId:before.sessionId,epoch:stateBefore.media.epoch});
   await close(before.sessionId);
