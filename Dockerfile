@@ -10,6 +10,7 @@ COPY tsconfig*.json ./
 COPY packages packages
 COPY apps apps
 COPY scripts scripts
+COPY session/fixture.html session/fixture.html
 RUN npm run build
 
 FROM node:24-bookworm AS api
@@ -21,6 +22,7 @@ CMD ["node","apps/api/dist/index.js"]
 
 FROM mcr.microsoft.com/playwright:v1.64.1-noble AS worker
 USER root
+RUN apt-get -o Acquire::Retries=0 -o Acquire::https::Timeout=20 update && apt-get -o Acquire::Retries=0 -o Acquire::https::Timeout=20 install -y --no-install-recommends ffmpeg x11-utils xdotool pulseaudio pulseaudio-utils && rm -rf /var/lib/apt/lists/*
 COPY --from=build /usr/local/bin/node /usr/local/bin/node24
 WORKDIR /app
 COPY --from=build /app /app

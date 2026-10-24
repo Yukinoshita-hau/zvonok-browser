@@ -1,0 +1,20 @@
+# Opt-in local overlay. Do not attach any Browser container to a Core network.
+# Start a separate isolated host Core process with browser.activity.enabled=true.
+services:
+  broker:
+    environment:
+      BROWSER_CORE_ORIGIN: http://127.0.0.1:3018
+  broker-2:
+    environment:
+      BROWSER_CORE_ORIGIN: http://127.0.0.1:3018
+  worker:
+    environment:
+      BROWSER_INTEGRATION: "1"
+  worker-2:
+    environment:
+      BROWSER_INTEGRATION: "1"
+  api:
+    networks: [control, authnet, edge]
+    environment:
+      BROWSER_INTEGRATION_KEY: "${BROWSER_INTEGRATION_KEY:?Set a dedicated random integration key (43+ characters)}"
+    ports: ["127.0.0.1:48035:3000"]

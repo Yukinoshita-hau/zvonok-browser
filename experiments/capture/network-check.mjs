@@ -80,6 +80,8 @@ const allowed = await new Promise((resolve) => {
       "CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n",
     ),
   );
+  const deadline=setTimeout(()=>{s.destroy();resolve(false)},10000);deadline.unref();
+  s.once('close',()=>{clearTimeout(deadline);resolve(false)});
   s.setTimeout(8000, () => {
     s.destroy();
     resolve(false);

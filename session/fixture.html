@@ -1,0 +1,28 @@
+<!doctype html><meta charset="utf-8"><style>
+html{scrollbar-width:none}::-webkit-scrollbar{display:none}body{margin:0;background:white;color:#14283c;font:24px sans-serif}header{position:fixed;top:0;background:white;width:100%;height:90px;z-index:2}main{padding:110px 24px;height:2600px}input,button{font:24px sans-serif}#box{width:80px;height:80px;background:#245cd0;animation:move 3s infinite alternate linear}@keyframes move{to{transform:translateX(1000px)}}p{line-height:1.6}
+</style><header><canvas id="clock" width="1280" height="48"></canvas><span id="status">Server Chromium capture — action 0</span></header><main><h1>Real Chromium text clarity 1280 × 720</h1><input aria-label="Text" id="text"><button id="change">Change pixels</button><div id="box"></div><p>ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789</p><p>Scrolling content — line 1</p><p>Scrolling content — line 2</p><p>Scrolling content — line 3</p><p>Scrolling content — line 4</p><p>Scrolling content — line 5</p><p>Scrolling content — line 6</p></main><script>
+let action=0;const c=document.querySelector('canvas').getContext('2d');
+function changed(){action++;document.querySelector('#status').textContent='Server Chromium capture — action '+action}
+addEventListener('scroll',changed);document.querySelector('button').onclick=changed;document.querySelector('input').oninput=changed;
+function draw(){c.fillStyle='white';c.fillRect(0,0,1280,48);let now=BigInt(Date.now());for(let i=0;i<48;i++){c.fillStyle=(now>>BigInt(i))&1n?'#f0f0f0':'#000';c.fillRect(16+i*12,16,12,24)}c.fillStyle=action%2?'#00ff00':'#ff0000';c.fillRect(640,16,80,24);for(let i=0;i<16;i++){c.fillStyle=(action>>i)&1?'#f0f0f0':'#000';c.fillRect(760+i*16,16,16,24)}for(let i=0;i<8;i++){c.fillStyle=(document.querySelector('#text').value.length>>i)&1?'#f0f0f0':'#000';c.fillRect(1024+i*16,16,16,24)}requestAnimationFrame(draw)}draw();
+</script>
+<button id="audio-test" style="position:fixed;left:960px;top:220px;z-index:5">Start A/V fixture</button>
+<div id="event-presence" style="position:fixed;left:1000px;top:560px;width:20px;height:20px;background:#080808;z-index:4"></div>
+<canvas id="event-code" width="240" height="120" style="position:fixed;left:1024px;top:560px;width:240px;height:120px;z-index:4"></canvas>
+<script>
+let audioContext,audioSource,audioStart,eventId=0;const events=[],eventPresence=document.querySelector('#event-presence'),eventCanvas=document.querySelector('#event-code'),eventContext=eventCanvas.getContext('2d');
+function avBytes(id){const bytes=[id>>8,id&255];let crc=0;for(const byte of bytes){crc^=byte;for(let i=0;i<8;i++)crc=crc&128?((crc<<1)^7)&255:(crc<<1)&255;}return [...bytes,crc]}
+function avBits(id){return avBytes(id).flatMap(byte=>Array.from({length:8},(_,i)=>(byte>>(7-i))&1))}
+function audioCode(id){const bits=avBits(id),tones=[2600,2800,3000,3200];for(let i=0;i<bits.length;i+=2)tones.push([1000,1300,1600,1900][bits[i]*2+bits[i+1]]);const rate=48000,step=1920,out=audioContext.createBuffer(2,tones.length*step,rate);for(let ch=0;ch<2;ch++){const data=out.getChannelData(ch);tones.forEach((freq,s)=>{for(let i=0;i<step;i++){const edge=Math.min(1,i/(rate*.004),(step-i)/(rate*.004));data[s*step+i]=.35*Math.max(0,edge)*Math.sin(2*Math.PI*freq*i/rate)}})}return out}
+// shortcut: IDs wrap after about 36 hours at the 2-second cadence, increase width before longer campaigns.
+function emitEvent(when){const id=eventId++&65535,source=audioContext.createBufferSource();source.buffer=audioCode(id);source.connect(audioContext.destination);source.start(when);events.push({id,when});}
+document.querySelector('#audio-test').onclick=async()=>{
+ if(audioSource){clearInterval(audioSource);audioSource=null;events.length=0;document.querySelector('#audio-test').textContent='Start A/V fixture';return;}
+ audioContext??=new AudioContext({sampleRate:48000});await audioContext.resume();
+ audioStart=audioContext.currentTime+.2;emitEvent(audioStart);audioSource=setInterval(()=>emitEvent(audioContext.currentTime+.1),2000);document.querySelector('#audio-test').textContent='Stop A/V fixture';
+};
+function drawEventCode(id){const bits=avBits(id);eventContext.fillStyle='#080808';eventContext.fillRect(0,0,240,120);bits.forEach((bit,i)=>{for(let repeat=0;repeat<3;repeat++){const cell=i*3+repeat,x=(cell%12)*20,y=Math.floor(cell/12)*20;eventContext.fillStyle=bit?'#f2f2f2':'#080808';eventContext.fillRect(x,y,20,20)}})}
+function avMarker(){const now=audioContext?.currentTime||-1,active=events.findLast(event=>now>=event.when&&now<event.when+.7);c.fillStyle=active&&now<active.when+.1?'white':'black';c.fillRect(1180,0,80,48);eventPresence.style.background=active?'#ff00ff':'#080808';eventContext.fillStyle='#080808';eventContext.fillRect(0,0,240,120);if(active)drawEventCode(active.id);requestAnimationFrame(avMarker);}avMarker();
+</script>
+
+<style>#edges{position:fixed;inset:0;pointer-events:none;z-index:10;background:linear-gradient(#ff00ff,#ff00ff) top/100% 4px no-repeat,linear-gradient(#00ffff,#00ffff) bottom/100% 4px no-repeat,linear-gradient(#ff8000,#ff8000) left/4px 100% no-repeat,linear-gradient(#0080ff,#0080ff) right/4px 100% no-repeat}.corner{position:absolute;width:8px;height:8px}</style><div id="edges"><i class="corner" style="left:0;top:0;background:#ff0000"></i><i class="corner" style="right:0;top:0;background:#00ff00"></i><i class="corner" style="left:0;bottom:0;background:#0000ff"></i><i class="corner" style="right:0;bottom:0;background:#ffff00"></i></div>

@@ -5,7 +5,7 @@ $headers=@{Authorization='Bearer '+$tokenLine.Substring(10)}
 $base='http://127.0.0.1:47831/api'
 $rows=[Collections.Generic.List[object]]::new()
 function Check($name,[scriptblock]$test) { try { & $test; $rows.Add(@{name=$name;result='PASS'}) } catch { $rows.Add(@{name=$name;result='FAIL';detail=$_.Exception.Message}) } }
-function Call($path,$method='GET',$body=$null) { $args=@{Uri=$base+$path;Method=$method;Headers=$headers}; if($null -ne $body){$args.ContentType='application/json';$args.Body=ConvertTo-Json -Compress $body}; Invoke-RestMethod @args }
+function Call($path,$method='GET',$body=$null) { if($method -eq 'POST' -and $path -match '/(navigate|back|forward|reload|input)$') { $current=Invoke-RestMethod -Uri ($base+($path -replace '/[^/]+$','')) -Headers $headers; if($current.collaboration) { $headers['x-control-epoch']=$current.collaboration.epoch; $headers['x-control-generation']=[string]$current.collaboration.generation } }; $args=@{Uri=$base+$path;Method=$method;Headers=$headers}; if($null -ne $body){$args.ContentType='application/json';$args.Body=ConvertTo-Json -Compress $body}; Invoke-RestMethod @args }
 Check 'health' { if((Call '/health').status -ne 'ok'){throw 'health'} }
 Check 'ready' { $ok=$false; for($i=0;$i -lt 20;$i++){try{if((Call '/ready').status -eq 'ready'){$ok=$true;break}}catch{};Start-Sleep -Milliseconds 500};if(-not $ok){throw 'Worker not ready'} }
 Check 'unauthorized rejected' { $r=Invoke-WebRequest "$base/sessions" -Method POST -ContentType application/json -Body '{}' -SkipHttpErrorCheck; if($r.StatusCode -ne 401){throw "HTTP $($r.StatusCode)"} }

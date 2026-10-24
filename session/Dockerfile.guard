@@ -1,0 +1,2 @@
+FROM zvonok-browser-poc-guard:latest
+COPY session/guard.sh /guard.sh

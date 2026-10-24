@@ -2,6 +2,7 @@ node_modules
 **/dist
 **/*.tsbuildinfo
 .env
+.env.*
 .git
 artifacts
 artifacts*.log
@@ -9,3 +10,6 @@ artifacts*.log
 
 media/node_modules
 media/livekit.local.yaml
+
+**/*.local.yaml
+**/*.local.yml

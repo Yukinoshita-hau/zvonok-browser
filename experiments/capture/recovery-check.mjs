@@ -12,4 +12,4 @@ try{
  await compose('restart','broker');await compose('up','-d','--no-deps','--force-recreate','publisher','capture');
  const after=await claims();assert.notEqual(before.video.room,after.video.room);assert.match(after.video.room,/^slice-2b1-/);const fresh=await viewer();await fresh.waitForTimeout(4000);assert.equal(await old.evaluate(()=>window.mediaMetrics.framesDecoded),frozen);rows.push({name:'old epoch viewer cannot receive new epoch frames',result:'PASS',oldRoom:before.video.room,newRoom:after.video.room});
  rows.push({name:'wrong viewer authorization denied; JWT subscribe only',result:'PASS'});
-}catch(e){rows.push({name:'recovery/epoch test',result:'FAIL',detail:e.message});process.exitCode=1}finally{await writeFile('artifacts/capture-recovery.json',JSON.stringify(rows,null,2));console.table(rows);await browser.close()}
+}catch(e){rows.push({name:'recovery/epoch test',result:'FAIL',detail:e.message});process.exitCode=1}finally{await writeFile(`artifacts/capture-recovery-${process.env.GATE_CAMPAIGN??'gate'}.json`,JSON.stringify(rows,null,2));console.table(rows);await browser.close()}

@@ -105,6 +105,8 @@ services:
     environment:
       FPS: "${MEDIA_FPS:-15}"
       CAPTURE_METHOD: "${CAPTURE_METHOD:-x11}"
+      CAPTURE_PUBLIC_CHECK: "${CAPTURE_PUBLIC_CHECK:-1}"
+      CAPTURE_REUSE: "${CAPTURE_REUSE:-0}"
       XDG_CONFIG_HOME: /tmp/config
       XDG_CACHE_HOME: /tmp/cache
 networks:

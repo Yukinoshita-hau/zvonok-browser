@@ -53,16 +53,16 @@ Set-Location C:\project\zvonok-browser
 npm.cmd ci
 npm.cmd run build
 npm.cmd test
-docker compose up -d --build
+docker compose -f compose.poc.yaml up -d --build
 Invoke-RestMethod http://127.0.0.1:47831/api/health
 Invoke-RestMethod http://127.0.0.1:47831/api/ready
 Start-Process http://127.0.0.1:47831
 pwsh -File scripts/acceptance.ps1
-docker compose exec worker node24 scripts/network-check.mjs
-docker compose exec worker node24 scripts/browser-check.mjs
+docker compose -f compose.poc.yaml exec worker node24 scripts/network-check.mjs
+docker compose -f compose.poc.yaml exec worker node24 scripts/browser-check.mjs
 pwsh -File scripts/lifecycle-check.ps1
-docker stats --no-stream $(docker compose ps -q)
-docker compose down
+docker stats --no-stream $(docker compose -f compose.poc.yaml ps -q)
+docker compose -f compose.poc.yaml down
 ```
 
 Browser harness is an explicitly local test program, not a remotely accessible evaluate/CDP API. It must run with no active service session. It uses actual Chromium plus controlled response fixtures for redirect/subresource tests and a controlled tall page for wheel behavior; raw network probes additionally exercise the namespace without Playwright interception.

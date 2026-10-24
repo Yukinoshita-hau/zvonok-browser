@@ -2,8 +2,8 @@ import { Type, type Static } from "@sinclair/typebox";
 const obj = <T extends Record<string, import("@sinclair/typebox").TSchema>>(
   properties: T,
 ) => Type.Object(properties, { additionalProperties: false });
-const x = Type.Integer({ minimum: 0, maximum: 1279 }),
-  y = Type.Integer({ minimum: 0, maximum: 719 });
+const x = Type.Integer({ minimum: 0, maximum: 1919 }),
+  y = Type.Integer({ minimum: 0, maximum: 1079 });
 export const Navigate = obj({
   url: Type.String({ maxLength: 2048, minLength: 1 }),
 });
@@ -55,18 +55,40 @@ export const Input = Type.Union([
   }),
 ]);
 export type InputAction = Static<typeof Input>;
+export interface Collaboration {
+  identity:string; role:'owner'|'guest'; ownerPresent:boolean; participants:string[]; sessionId:string; epoch:string;
+  controller:string; generation:number; expiresAt:number; serverTime:number; request?:string; result:string; membershipExpiresAt?:number;
+}
 export interface BrowserSession {
+  collaboration?: Collaboration;
   sessionId: string;
   ownerId: string;
   status: "creating" | "active" | "closing" | "closed" | "crashed" | "expired";
+  browserReady?: boolean;
+  media?: { epoch: string; room: string; publisher: string; profile: string; width: number; height: number; fps: number; state: "starting" | "streaming" | "media_reconnecting" | "closed" };
+  navigationError?: "timeout" | "upstream" | "browser_unavailable";
   createdAt: string;
   lastActivityAt: string;
   currentUrl: string;
+  tabs?: { id: string; url: string; title: string }[];
+  activeTabId?: string;
   workerId: string;
   expiresAt: string;
   idleExpiresAt: string;
 }
-export const allowedHosts = new Set(["example.com", "www.selenium.dev"]);
+export const allowedHosts = new Set([
+  "example.com",
+  "www.selenium.dev",
+  "google.com",
+  "googleapis.com",
+  "gstatic.com",
+  "googleusercontent.com",
+  "youtube.com",
+  "youtu.be",
+  "googlevideo.com",
+  "ytimg.com",
+  "ggpht.com",
+]);
 export function allowedUrl(value: string): boolean {
   try {
     const u = new URL(value);
@@ -75,7 +97,9 @@ export function allowedUrl(value: string): boolean {
       !u.username &&
       !u.password &&
       (!u.port || u.port === "443") &&
-      allowedHosts.has(u.hostname)
+      [...allowedHosts].some(
+        (host) => u.hostname === host || u.hostname.endsWith(`.${host}`),
+      )
     );
   } catch {
     return false;

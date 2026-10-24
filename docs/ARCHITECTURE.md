@@ -1,5 +1,9 @@
 # Архитектура Slice 0–1
 
+Slice 3 extends only the dedicated session deployment with Worker-owned two-member identity/invites/control leases and Broker membership-gated LiveKit signaling. See [shared room protocol, lifecycle and acceptance](SLICE-3-SHARED-BROWSER-REPORT.md). The existing Chromium/capture/publisher pipeline remains one per session; no Core services participate.
+
+Slice2B.2 adds a dedicated session deployment without changing this original topology. See [unified BrowserSession ownership, lifecycle and acceptance](SLICE-2B2-SESSION-INTEGRATION-REPORT.md). Its Worker owns one headful Chromium/private Xvfb/FFmpeg per BrowserSession; commands, PNG and live pixels use that same context. Session/owner/epoch-bound broker authorization and server-side room deletion connect it to the publisher and unified React client.
+
 Подробный утверждённый контракт: [SLICE-0-1-SPEC.md](SLICE-0-1-SPEC.md). npm workspaces, единый lockfile, TypeScript strict. Shared DTO и runtime schemas в packages/protocol. Продуктовый API не предоставляет eval, CDP, selectors или имена Playwright methods.
 
 ```mermaid

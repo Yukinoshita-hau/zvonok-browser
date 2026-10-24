@@ -3,7 +3,7 @@ set -eu
 rm -f /guard/ready
 iptables -P OUTPUT DROP
 iptables -F OUTPUT
-iptables -A OUTPUT -d 172.30.81.2 -p tcp --dport 3128 -j ACCEPT
+iptables -A OUTPUT -d "${BROWSER_PROXY_IP:-172.30.81.2}" -p tcp --dport 3128 -j ACCEPT
 ip6tables -P OUTPUT DROP
 ip6tables -F OUTPUT
 # Docker embedded DNS installs NAT rules: remove them in this dedicated namespace.

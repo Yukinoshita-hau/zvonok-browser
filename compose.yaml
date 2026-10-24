@@ -1,92 +1,175 @@
-name: zvonok-browser-poc
+# Docker Compose >= 2.24.4. Local Core integration; see docs/DOCKER-COMPOSE.md.
+name: zvonok-browser
+
+x-media-build: &media-build
+  context: .
+  dockerfile: session/Dockerfile.media
+x-publisher-health: &publisher-health
+  test: [CMD, node, -e, "require('fs').accessSync(process.env.BROWSER_TOKEN_SOCKET || '/auth/token.sock');require.resolve('@livekit/rtc-node')"]
+  interval: 10s
+  timeout: 3s
+  retries: 12
+  start_period: 10s
+
 services:
-  proxy:
-    build: { context: ., target: proxy }
-    networks:
-      browser: { ipv4_address: 172.30.81.2 }
-      outbound: {}
+  config-init:
+    image: node:24-bookworm-slim
+    network_mode: none
+    read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    read_only: true
-    cpus: 0.5
-    mem_limit: 128m
-    pids_limit: 64
-    sysctls: { net.ipv4.ip_forward: "0" }
-  guard:
-    build: { context: ., dockerfile: infra/Dockerfile.guard }
-    networks:
-      browser: { ipv4_address: 172.30.81.3 }
-    cap_drop: [ALL]
-    cap_add: [NET_ADMIN]
-    security_opt: [no-new-privileges:true]
-    volumes: [guard-state:/guard]
-    tmpfs: [/run]
-    read_only: true
-    mem_limit: 32m
-    pids_limit: 16
-    healthcheck:
-      test:
-        [
-          CMD-SHELL,
-          'test "$(cat /guard/ready)" = firewall-v1 && iptables -C OUTPUT -d 172.30.81.2 -p tcp --dport 3128 -j ACCEPT',
-        ]
-      interval: 2s
-      timeout: 1s
-      retries: 15
-  worker:
-    environment:
-      XDG_CONFIG_HOME: /tmp/browser-config
-      XDG_CACHE_HOME: /tmp/browser-cache
-    build: { context: ., target: worker }
-    network_mode: service:guard
-    depends_on:
-      guard: { condition: service_healthy }
-      proxy: { condition: service_started }
-    volumes: [control:/control, guard-state:/guard:ro]
-    cap_drop: [ALL]
-    security_opt: [no-new-privileges:true, "seccomp=./infra/seccomp.json"]
-    read_only: true
-    tmpfs: ["/tmp:size=512m,mode=1777"]
-    shm_size: 256m
-    init: true
-    cpus: 2
-    mem_limit: 768m
-    pids_limit: 256
-    stop_grace_period: 15s
-  api:
-    build: { context: ., target: api }
-    networks:
-      control: { ipv4_address: 172.30.82.3 }
-    volumes: [control:/control]
-    environment: { DEV_TOKEN: "${DEV_TOKEN:?Set DEV_TOKEN in .env}" }
-    cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
-    read_only: true
-    cpus: 0.5
-    mem_limit: 128m
-    pids_limit: 64
-    depends_on: [worker]
-  client:
-    build: { context: ., target: client }
-    networks: [control, edge]
-    ports: ["127.0.0.1:${BROWSER_PORT:-47831}:8080"]
-    depends_on: [api]
-    cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
-    read_only: true
-    tmpfs: [/tmp]
     mem_limit: 64m
-    pids_limit: 32
+    pids_limit: 16
+    volumes: [livekit-config:/config]
+    environment:
+      BROWSER_LIVEKIT_SECRET: "${BROWSER_LIVEKIT_SECRET:?Set a dedicated random 64-character hex secret in .env}"
+      BROWSER_LIVEKIT_PORT: "${BROWSER_LIVEKIT_PORT:-48034}"
+      BROWSER_LIVEKIT_UDP_PORT: "${BROWSER_LIVEKIT_UDP_PORT:-48035}"
+      BROWSER_LIVEKIT_NODE_IP: "${BROWSER_LIVEKIT_NODE_IP:-127.0.0.1}"
+    command:
+      - node
+      - -e
+      - |
+        const fs = require('node:fs'), secret = process.env.BROWSER_LIVEKIT_SECRET, {isIP} = require('node:net');
+        if (!/^[a-f0-9]{64}$$/i.test(secret)) throw Error('BROWSER_LIVEKIT_SECRET must be 64 hex characters');
+        if (isIP(process.env.BROWSER_LIVEKIT_NODE_IP) !== 4) throw Error('BROWSER_LIVEKIT_NODE_IP must be an IPv4 address');
+        const config = [
+          'port: 7880', 'bind_addresses: ["0.0.0.0"]', 'rtc:',
+          '  tcp_port: ' + (process.env.BROWSER_LIVEKIT_PORT || '48034'), '  udp_port: ' + (process.env.BROWSER_LIVEKIT_UDP_PORT || '48035'),
+          '  node_ip: ' + process.env.BROWSER_LIVEKIT_NODE_IP, '  use_external_ip: false', '  enable_loopback_candidate: true',
+          'keys:', '  spike: ' + secret, 'logging:', '  level: warn', ''
+        ].join('\n');
+        fs.writeFileSync('/config/livekit.yaml.tmp', config, {mode: 0o444});
+        fs.renameSync('/config/livekit.yaml.tmp', '/config/livekit.yaml');
+
+  proxy:
+    extends: {file: compose.session.yaml, service: proxy}
+    image: zvonok-browser-proxy:compose
+    build: {context: ., target: proxy}
+    restart: unless-stopped
+
+  guard:
+    extends: {file: compose.session.yaml, service: guard}
+    image: zvonok-browser-guard:compose
+    restart: unless-stopped
+
+  worker:
+    extends: {file: compose.session.yaml, service: worker}
+    cpus: 8
+    image: zvonok-browser-worker:compose
+    environment:
+      BROWSER_INTEGRATION: "1"
+    volumes: !override [control:/control, binding:/binding, frames:/frames, guard-state:/guard:ro]
+    healthcheck:
+      test: [CMD-SHELL, "test -S /control/worker.sock"]
+      interval: 5s
+      timeout: 2s
+      retries: 24
+
+  worker-2:
+    extends: {file: compose.session.yaml, service: worker-2}
+    cpus: 8
+    image: zvonok-browser-worker:compose
+    environment:
+      BROWSER_INTEGRATION: "1"
+    volumes: !override [control:/control, binding-2:/binding, frames-2:/frames, guard-state:/guard:ro]
+    healthcheck:
+      test: [CMD-SHELL, "test -S /control/worker-2.sock"]
+      interval: 5s
+      timeout: 2s
+      retries: 24
+
+  api:
+    extends: {file: compose.session.yaml, service: api}
+    image: zvonok-browser-api:compose
+    restart: unless-stopped
+    networks:
+      control: {}
+      authnet: {}
+      core:
+        aliases: [browser-api]
+    depends_on:
+      worker: {condition: service_healthy}
+      worker-2: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
+
+  livekit:
+    extends: {file: compose.session.yaml, service: livekit}
+    restart: unless-stopped
+    volumes: !override [livekit-config:/config:ro]
+    depends_on:
+      config-init: {condition: service_completed_successfully}
+    # Bind to loopback for local-only use; deployments set BROWSER_LIVEKIT_BIND_ADDRESS to a routable interface.
+    ports: !override ["${BROWSER_LIVEKIT_BIND_ADDRESS:-127.0.0.1}:${BROWSER_LIVEKIT_PORT:-48034}:47836/tcp", "${BROWSER_LIVEKIT_BIND_ADDRESS:-127.0.0.1}:${BROWSER_LIVEKIT_UDP_PORT:-48035}:${BROWSER_LIVEKIT_UDP_PORT:-48035}/udp"]
+
+  broker:
+    extends: {file: compose.session.yaml, service: broker}
+    image: zvonok-browser-media:compose
+    environment:
+      BROWSER_CORE_ORIGIN: "${BROWSER_UI_ORIGIN:-http://localhost:3000}"
+    volumes: !override [binding:/binding, auth:/auth, livekit-config:/secrets:ro]
+
+  broker-2:
+    extends: {file: compose.session.yaml, service: broker-2}
+    image: zvonok-browser-media:compose
+    environment:
+      BROWSER_CORE_ORIGIN: "${BROWSER_UI_ORIGIN:-http://localhost:3000}"
+    volumes: !override [binding-2:/binding, auth-2:/auth, livekit-config:/secrets:ro]
+
+  publisher:
+    extends: {file: compose.session.yaml, service: publisher}
+    cpus: 4
+    image: zvonok-browser-media:compose
+    build: *media-build
+    volumes: !override [auth:/auth, frames:/frames]
+    healthcheck: *publisher-health
+
+  publisher-2:
+    extends: {file: compose.session.yaml, service: publisher-2}
+    cpus: 4
+    image: zvonok-browser-media:compose
+    volumes: !override [auth-2:/auth, frames-2:/frames]
+    healthcheck: *publisher-health
+
+  rtc-relay:
+    extends: {file: compose.session.yaml, service: rtc-relay}
+    image: zvonok-browser-media:compose
+    build: *media-build
+    restart: unless-stopped
+    environment:
+      BROWSER_LIVEKIT_PORT: "${BROWSER_LIVEKIT_PORT:-48034}"
+    healthcheck:
+      test: [CMD, node, -e, "const net=require('net'),ports=[Number(process.env.BROWSER_LIVEKIT_PORT||48034),47836];Promise.all(ports.map(port=>new Promise((resolve,reject)=>{const s=net.connect(port,'127.0.0.1',()=>{s.destroy();resolve()});s.on('error',reject);s.setTimeout(1500,()=>s.destroy(Error('timeout')))}))).then(()=>process.exit(0),()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+
 networks:
-  edge: {}
-  control:
-    internal: true
-    ipam: { config: [{ subnet: 172.30.82.0/24 }] }
+  core:
+    external: true
+    name: "${ZVONOK_CORE_NETWORK:-zvonok-net}"
   browser:
     internal: true
-    ipam: { config: [{ subnet: 172.30.81.0/24 }] }
+    ipam: {config: [{subnet: "${BROWSER_SUBNET:-172.30.87.0/24}"}]}
+  control: {internal: true}
+  authnet: {internal: true}
+  media: {internal: true}
   outbound: {}
-volumes:
-  control: {}
-  guard-state: {}
+  edge: {}
+  rtc-edge: {}
 
+volumes:
+  livekit-config: {}
+  guard-state: {}
+  control: {}
+  binding: {}
+  frames: {}
+  auth: {}
+  binding-2: {}
+  frames-2: {}
+  auth-2: {}

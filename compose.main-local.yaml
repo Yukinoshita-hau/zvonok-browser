@@ -1,0 +1,15 @@
+# Opt-in overlay for the existing local Zvonok Core Docker network.
+# Browser API alone joins this network; Worker remains on its guarded network namespace.
+services:
+  broker:
+    environment:
+      BROWSER_CORE_ORIGIN: "${BROWSER_UI_ORIGIN:-http://localhost:3000}"
+  api:
+    networks:
+      zvonok-core:
+        aliases: [browser-api]
+
+networks:
+  zvonok-core:
+    external: true
+    name: "${ZVONOK_CORE_NETWORK:-zvonok-net}"

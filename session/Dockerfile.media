@@ -1,0 +1,16 @@
+FROM node:24-bookworm-slim
+WORKDIR /media
+COPY media/package*.json ./
+RUN npm ci
+COPY session/frame.mjs /media/frame.mjs
+COPY session/source-health.mjs /media/source-health.mjs
+COPY session/audio.mjs session/grants.mjs /media/
+COPY session/audio-publisher.mjs session/audio-submit.mjs session/audio-diagnostics.mjs /media/
+COPY session/rtc-relay.mjs /media/session-relay.mjs
+COPY session/signaling-gate.mjs /media/signaling-gate.mjs
+COPY session/broker.mjs /media/session-broker.mjs
+COPY session/session-publisher.mjs session/publisher-disconnect.mjs session/media-profiles.mjs /media/
+COPY session/publisher-supervisor.mjs /media/publisher-supervisor.mjs
+RUN mkdir -p /binding /auth /frames && chown 1000:1000 /binding /auth /frames
+USER 1000:1000
+CMD ["node","publisher-supervisor.mjs"]

@@ -103,7 +103,7 @@ const server = createServer((req, res) => {
       res.writeHead(400).end();
       return;
     }
-    lastReceived=Date.now();
+    lastReceived=performance.now();
     received++;
     if (latest) dropped++;
     latest = b;
@@ -128,7 +128,7 @@ function submitLatest() {
   submitted++;
   if(submitted%fps===0)console.log(JSON.stringify({kind:'submit-stage',at:Date.now(),captureAvailableMs:b.readDoubleLE(16),captureToSubmitMs:Date.now()-b.readDoubleLE(16),videoFrameAndCaptureCallMs:performance.now()-submitStart}));
 }
-const sourceHealth=setInterval(()=>{if(lastReceived && Date.now()-lastReceived>2000)void close(0)},100);
+const sourceHealth=setInterval(()=>{if(lastReceived && performance.now()-lastReceived>2000){console.log(JSON.stringify({kind:'source-lost',at:Date.now(),gapMs:performance.now()-lastReceived,received,submitted}));void close(0)}},100);
 const start = Date.now();
 const stats = setInterval(async () => {
   try {
