@@ -1,5 +1,5 @@
 import { it, expect } from 'vitest';
-import { Registry, validBinding } from './broker.mjs';
+import { Registry, validBinding, validCoreOrigin } from './broker.mjs';
 const sessionId='12345678-1234-1234-1234-123456789012',epoch='abcd1234-1234-1234-1234-123456789012';
 const b=()=>({sessionId,epoch,ownerId:'local-owner',expiresAt:new Date(Date.now()+60000).toISOString(),profile:'720p15'});
 it('strict binding rejects unknown owner, extra props, expired lease',()=>{
@@ -8,6 +8,15 @@ it('strict binding rejects unknown owner, extra props, expired lease',()=>{
   expect(validBinding({...b(),room:'arbitrary'})).toBe(false);
   expect(validBinding({...b(),expiresAt:new Date(0).toISOString()})).toBe(false);
   expect(validBinding({...b(),profile:'4k60'})).toBe(false);
+});
+it('allows exact HTTPS Core origins and only local HTTP origins',()=>{
+  expect(validCoreOrigin('https://zvonok.example')).toBe(true);
+  expect(validCoreOrigin('https://zvonok.example:8443')).toBe(true);
+  expect(validCoreOrigin('http://localhost:3000')).toBe(true);
+  expect(validCoreOrigin('http://127.0.0.1:3000')).toBe(true);
+  expect(validCoreOrigin('http://zvonok.example')).toBe(false);
+  expect(validCoreOrigin('https://zvonok.example/')).toBe(false);
+  expect(validCoreOrigin('https://zvonok.example/path')).toBe(false);
 });
 it('revoke blocks tokens before deleting, refuses next epoch until deletion completes',async()=>{
   let release;const r=new Registry(()=>new Promise(resolve=>{release=resolve;}));

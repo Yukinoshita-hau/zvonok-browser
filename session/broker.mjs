@@ -11,6 +11,12 @@ export function validBinding(b) {
     Object.hasOwn(mediaProfiles, b.profile) &&
     Number.isFinite(Date.parse(b.expiresAt)) && Date.parse(b.expiresAt)>Date.now() && Date.parse(b.expiresAt)<=Date.now()+1200000;
 }
+export function validCoreOrigin(value) {
+  try {
+    const origin = new URL(value);
+    return origin.origin === value && (origin.protocol === 'https:' || (origin.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(origin.hostname)));
+  } catch { return false; }
+}
 export class Registry {
   current;
   constructor(removeRoom, persist = async()=>{}) { this.removeRoom=removeRoom;this.persist=persist; }
@@ -41,7 +47,7 @@ async function main() {
   const registry=new Registry(remove,b=>writeFile(journal,JSON.stringify(b),{mode:0o600}));
   const verifier=new TokenVerifier('spike',secret);
   const coreOrigin=process.env.BROWSER_CORE_ORIGIN;
-  if(coreOrigin && !/^http:\/\/(127\.0\.0\.1|localhost):[0-9]{2,5}$/.test(coreOrigin))throw Error('Local Core origin required');
+  if(coreOrigin && !validCoreOrigin(coreOrigin))throw Error('HTTPS or local HTTP Core origin required');
   const gate=signalingGate(registry,token=>verifier.verify(token),coreOrigin?[coreOrigin]:undefined);
   gate.server.listen(3002,'0.0.0.0');
   let tail=Promise.resolve(), pending=0;
